@@ -140,6 +140,60 @@ export const checkAppPermissions = async (
 };
 
 /**
+ * Posts Semgrep scan results as a GitHub comment with text output
+ */
+export const postSemgrepResultsComment = async (
+  octokit: InstanceType<typeof Octokit>,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  textOutput: string,
+  findingsCount: number,
+  eventType: "opened" | "reopened" = "opened"
+): Promise<boolean> => {
+  try {
+    Logger.info(`Posting Semgrep results comment to PR #${prNumber}`);
+
+    // Format text output for GitHub comment with proper markdown
+    const commentBody = `🔍 **Semgrep Security Scan Results**
+
+${
+  findingsCount > 0
+    ? `Found **${findingsCount}** potential security issue(s):
+
+\`\`\`
+${textOutput}
+\`\`\``
+    : "🎉 **No security issues found!** ✅"
+}
+
+*This scan was performed automatically when the pull request was ${eventType}.*
+*Found issues? Check the [Semgrep documentation](https://semgrep.dev/docs/) for remediation guidance.*`;
+
+    await octokit.rest.issues.createComment({
+      owner,
+      repo,
+      issue_number: prNumber,
+      body: commentBody,
+    });
+
+    Logger.success(`Posted Semgrep results comment to PR #${prNumber}`);
+    return true;
+  } catch (error: any) {
+    Logger.error(`Failed to post comment to PR #${prNumber}:`, error);
+
+    if (error.status === 403) {
+      Logger.warning(
+        `⚠️ Cannot post comment to ${owner}/${repo}: Missing 'issues: write' permission. ` +
+          `Please update your GitHub App permissions to include 'Issues: Read & Write'.`
+      );
+    }
+
+    return false;
+  }
+};
+
+/**
  * Creates a GitHub check run for Semgrep results with fallback
  */
 export const createCheckRun = async (

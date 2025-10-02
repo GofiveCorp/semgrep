@@ -24,7 +24,7 @@ async function main(): Promise<void> {
 
     // Setup webhook handlers
     console.log("🎣 Setting up webhook handlers...");
-    setupWebhookHandlers(app, config.messageForNewPRs);
+    setupWebhookHandlers(app);
 
     // Start the webhook server
     console.log("🌐 Starting webhook server...");

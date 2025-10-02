@@ -7,8 +7,22 @@ This GitHub App automatically performs security scanning using [Semgrep](https:/
 - **Automated Security Scanning**: Scans code for vulnerabilities when PRs are opened/reopened
 - **GitHub Status Checks**: Creates status checks that can block merging if critical issues are found
 - **Detailed Reporting**: Posts detailed findings as PR comments with severity levels
+- **Text Output Integration**: Generates human-readable text output for easy consumption
+- **External Webhook Support**: Send scan results to external monitoring systems
+- **File Export**: Archive scan results to local files
 - **Custom Rules**: Includes both Semgrep Registry rules and custom security patterns
 - **Permission-Aware**: Gracefully handles missing permissions with informative logging
+
+## 📋 New Text Output Features
+
+🎉 **Now supports text output for better integration and readability!**
+
+- **Human-Readable Format**: Same format as Semgrep CLI output
+- **GitHub Comments**: Formatted text output in PR comments
+- **Webhook Integration**: Send results to external services
+- **File Export**: Save results for archival and analysis
+
+📖 **[Complete Text Output Guide](./SEMGREP_TEXT_OUTPUT.md)**
 
 ## 📋 Requirements
 

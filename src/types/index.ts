@@ -4,6 +4,10 @@ export interface EnvironmentConfig {
   WEBHOOK_SECRET: string;
   ENTERPRISE_HOSTNAME?: string;
   PORT?: string;
+  SEMGREP_WEBHOOK_URL?: string;
+  EXPORT_RESULTS?: string;
+  SEMGREP_CONFIG?: string;
+  SEMGREP_TIMEOUT?: string;
 }
 
 export interface AppConfig {
@@ -13,4 +17,9 @@ export interface AppConfig {
   enterpriseHostname?: string;
   port: string;
   messageForNewPRs: string;
+  // Semgrep configuration
+  semgrepWebhookUrl?: string;
+  exportResults: boolean;
+  semgrepConfig: string;
+  semgrepTimeout: number;
 }

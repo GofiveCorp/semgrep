@@ -55,5 +55,10 @@ export const loadConfig = (): AppConfig => {
     enterpriseHostname,
     port,
     messageForNewPRs,
+    // Semgrep configuration
+    semgrepWebhookUrl: process.env.SEMGREP_WEBHOOK_URL,
+    exportResults: process.env.EXPORT_RESULTS === "true",
+    semgrepConfig: process.env.SEMGREP_CONFIG || "auto",
+    semgrepTimeout: parseInt(process.env.SEMGREP_TIMEOUT || "300"),
   };
 };

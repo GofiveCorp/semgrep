@@ -71,6 +71,118 @@ export class SemgrepService {
   private readonly defaultTimeout = 300; // 5 minutes
 
   /**
+   * Runs Semgrep scan and returns text output for display
+   */
+  async scanDirectoryForTextOutput(
+    targetPath: string,
+    options: SemgrepScanOptions = {}
+  ): Promise<{ jsonResult: SemgrepResult; textOutput: string }> {
+    const {
+      config = this.defaultConfig,
+      severity = [],
+      excludePaths = [],
+      timeout = this.defaultTimeout,
+    } = options;
+
+    // Build Semgrep command for text output
+    const tempDir = path.join(process.cwd(), "temp");
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    const textOutputFile = path.join(tempDir, `semgrep-text-${Date.now()}.txt`);
+    const jsonOutputFile = path.join(
+      tempDir,
+      `semgrep-json-${Date.now()}.json`
+    );
+
+    const semgrepArgsText = [
+      "--config",
+      config,
+      "--no-git-ignore",
+      "--timeout",
+      timeout.toString(),
+      "-o",
+      textOutputFile,
+    ];
+
+    const semgrepArgsJson = [
+      "--config",
+      config,
+      "--json",
+      "--no-git-ignore",
+      "--timeout",
+      timeout.toString(),
+      "-o",
+      jsonOutputFile,
+    ];
+
+    // Add severity filters if specified
+    if (severity.length > 0) {
+      severity.forEach((sev) => {
+        semgrepArgsText.push("--severity", sev);
+        semgrepArgsJson.push("--severity", sev);
+      });
+    }
+
+    // Add exclude paths if specified
+    excludePaths.forEach((excludePath) => {
+      semgrepArgsText.push("--exclude", excludePath);
+      semgrepArgsJson.push("--exclude", excludePath);
+    });
+
+    // Add target path
+    semgrepArgsText.push(targetPath);
+    semgrepArgsJson.push(targetPath);
+
+    const textCommand = `semgrep ${semgrepArgsText.join(" ")}`;
+    const jsonCommand = `semgrep ${semgrepArgsJson.join(" ")}`;
+
+    try {
+      console.log(`🔍 Running Semgrep scan for text output: ${textCommand}`);
+      console.log(`🔍 Running Semgrep scan for JSON output: ${jsonCommand}`);
+
+      // Run both commands
+      await Promise.all([
+        execAsync(textCommand, {
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: timeout * 1000,
+        }),
+        execAsync(jsonCommand, {
+          maxBuffer: 10 * 1024 * 1024,
+          timeout: timeout * 1000,
+        }),
+      ]);
+
+      // Read both outputs
+      const textOutput = await fs.promises.readFile(textOutputFile, "utf-8");
+      const jsonData = await fs.promises.readFile(jsonOutputFile, "utf-8");
+      const jsonResult: SemgrepResult = JSON.parse(jsonData);
+
+      // Clean up output files
+      try {
+        await fs.promises.unlink(textOutputFile);
+        await fs.promises.unlink(jsonOutputFile);
+      } catch (cleanupError) {
+        console.warn(`⚠️ Could not clean up output files`);
+      }
+
+      console.log(
+        `✅ Semgrep scan completed. Found ${jsonResult.results.length} findings.`
+      );
+
+      return { jsonResult, textOutput };
+    } catch (error: any) {
+      if (error.code === "ENOENT") {
+        throw new Error("Semgrep CLI not found. Please install Semgrep first.");
+      }
+
+      if (error.signal === "SIGTERM") {
+        throw new Error(`Semgrep scan timed out after ${timeout} seconds.`);
+      }
+
+      throw new Error(`Semgrep scan failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Runs Semgrep scan on a directory
    */
   async scanDirectory(
@@ -86,6 +198,10 @@ export class SemgrepService {
     } = options;
 
     // Build Semgrep command
+    const tempDir = path.join(process.cwd(), "temp");
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    const outputFile = path.join(tempDir, `semgrep-output-${Date.now()}.txt`);
+
     const semgrepArgs = [
       "--config",
       config,
@@ -93,6 +209,8 @@ export class SemgrepService {
       "--no-git-ignore", // Include all files for comprehensive scanning
       "--timeout",
       timeout.toString(),
+      "-o",
+      outputFile,
     ];
 
     // Add severity filters if specified
@@ -122,12 +240,29 @@ export class SemgrepService {
       if (stderr && !stderr.includes("WARNING")) {
         console.warn(`⚠️ Semgrep warnings: ${stderr}`);
       }
-      console.log(`✅ RAW Semgrep scan completed. Found ${stdout} findings.`);
 
-      const result: SemgrepResult = JSON.parse(stdout);
-      console.log(
-        `✅ Semgrep scan completed. Found ${result.results.length} findings.`
-      );
+      // Read results from output file
+      let result: SemgrepResult;
+      try {
+        const outputData = await fs.promises.readFile(outputFile, "utf-8");
+        result = JSON.parse(outputData);
+        console.log(
+          `✅ Semgrep scan completed. Found ${result.results.length} findings.`
+        );
+      } catch (fileError) {
+        console.warn(`⚠️ Could not read output file, falling back to stdout`);
+        result = JSON.parse(stdout);
+        console.log(
+          `✅ Semgrep scan completed (from stdout). Found ${result.results.length} findings.`
+        );
+      }
+
+      // Clean up output file
+      try {
+        await fs.promises.unlink(outputFile);
+      } catch (cleanupError) {
+        console.warn(`⚠️ Could not clean up output file: ${outputFile}`);
+      }
 
       return result;
     } catch (error: any) {
@@ -150,6 +285,26 @@ export class SemgrepService {
         } catch (parseError) {
           console.error("Failed to parse Semgrep output:", error.stdout);
         }
+      }
+
+      // Try to read from output file if stdout parsing failed
+      try {
+        const outputData = await fs.promises.readFile(outputFile, "utf-8");
+        const result: SemgrepResult = JSON.parse(outputData);
+        console.log(
+          `⚠️ Semgrep scan completed with findings (from file). Found ${result.results.length} issues.`
+        );
+
+        // Clean up output file
+        try {
+          await fs.promises.unlink(outputFile);
+        } catch (cleanupError) {
+          console.warn(`⚠️ Could not clean up output file: ${outputFile}`);
+        }
+
+        return result;
+      } catch (fileError: any) {
+        console.error("Failed to read output file:", fileError.message);
       }
 
       throw new Error(`Semgrep scan failed: ${error.message}`);
@@ -361,6 +516,93 @@ export class SemgrepService {
       title: "No security issues found",
       summary: `✅ Semgrep scan completed successfully.\nℹ️ **${infoCount}** informational findings.`,
     };
+  }
+
+  /**
+   * Sends Semgrep text output to external webhook or service
+   */
+  async sendToExternalService(
+    textOutput: string,
+    webhookUrl?: string,
+    metadata?: {
+      repository: string;
+      pullRequest: number;
+      branch: string;
+      findingsCount: number;
+    }
+  ): Promise<boolean> {
+    if (!webhookUrl) {
+      console.log("📤 No webhook URL provided, logging output instead:");
+      console.log("=".repeat(50));
+      console.log(textOutput);
+      console.log("=".repeat(50));
+      return true;
+    }
+
+    try {
+      console.log(
+        `📤 Sending Semgrep results to external service: ${webhookUrl}`
+      );
+
+      const payload = {
+        timestamp: new Date().toISOString(),
+        source: "semgrep-github-app",
+        scanResults: {
+          textOutput,
+          findingsCount: metadata?.findingsCount || 0,
+        },
+        repository: metadata?.repository,
+        pullRequest: metadata?.pullRequest,
+        branch: metadata?.branch,
+      };
+
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "semgrep-github-app/1.0",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        console.log(`✅ Successfully sent results to external service`);
+        return true;
+      } else {
+        console.error(
+          `❌ Failed to send to external service: ${response.status} ${response.statusText}`
+        );
+        return false;
+      }
+    } catch (error: any) {
+      console.error(`❌ Error sending to external service:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Exports Semgrep text output to a file
+   */
+  async exportToFile(
+    textOutput: string,
+    filename?: string,
+    directory?: string
+  ): Promise<string> {
+    const exportDir = directory || path.join(process.cwd(), "exports");
+    await fs.promises.mkdir(exportDir, { recursive: true });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const exportFilename = filename || `semgrep-results-${timestamp}.txt`;
+    const exportPath = path.join(exportDir, exportFilename);
+
+    try {
+      await fs.promises.writeFile(exportPath, textOutput, "utf-8");
+      console.log(`📁 Exported Semgrep results to: ${exportPath}`);
+      return exportPath;
+    } catch (error: any) {
+      console.error(`❌ Failed to export results to file:`, error.message);
+      throw error;
+    }
   }
 
   /**

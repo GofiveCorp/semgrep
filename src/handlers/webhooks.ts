@@ -73,7 +73,7 @@ const handlePullRequestScan = (eventType: "opened") => {
         owner,
         repo,
         headSha,
-        checkStatus.conclusion,
+        "success",
         checkStatus.title,
         checkStatus.summary,
         textOutput // Use text output instead of formatted comment

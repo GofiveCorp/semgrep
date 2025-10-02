@@ -16,7 +16,6 @@ export interface AppConfig {
   secret: string;
   enterpriseHostname?: string;
   port: string;
-  messageForNewPRs: string;
   // Semgrep configuration
   semgrepWebhookUrl?: string;
   exportResults: boolean;

@@ -43,10 +43,6 @@ export const loadConfig = (): AppConfig => {
   const port = process.env.PORT || "3000";
 
   const privateKey = readFileWithErrorHandling(privateKeyPath, "private key");
-  const messageForNewPRs = readFileWithErrorHandling(
-    "./message.md",
-    "message template"
-  );
 
   return {
     appId,
@@ -54,7 +50,6 @@ export const loadConfig = (): AppConfig => {
     secret,
     enterpriseHostname,
     port,
-    messageForNewPRs,
     // Semgrep configuration
     semgrepWebhookUrl: process.env.SEMGREP_WEBHOOK_URL,
     exportResults: process.env.EXPORT_RESULTS === "true",

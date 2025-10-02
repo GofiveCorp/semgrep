@@ -3,7 +3,6 @@ import { SemgrepService } from "../services/semgrep.js";
 import {
   cloneRepository,
   createCheckRun,
-  checkAppPermissions,
   postSemgrepResultsComment,
 } from "../services/github.js";
 import { Logger } from "../utils/index.js";
@@ -24,51 +23,17 @@ const handlePullRequestScan = (eventType: "opened") => {
 
     try {
       // Check GitHub App permissions first
-      const permissions = await checkAppPermissions(octokit, owner, repo);
-
-      if (!permissions.hasContentsRead) {
-        Logger.warning(
-          `⚠️ Missing 'contents: read' permission for ${owner}/${repo}. Repository cloning may fail.`
-        );
-      }
-
-      if (!true) {
-        Logger.warning(
-          `⚠️ Missing 'issues: write' permission for ${owner}/${repo}. Cannot post comments.`
-        );
-      }
-
-      if (!permissions.hasChecksWrite) {
-        Logger.warning(
-          `⚠️ Missing 'checks: write' permission for ${owner}/${repo}. Status checks will not be created.`
-        );
-        Logger.info(
-          `To enable status checks, visit https://github.com/settings/apps and grant 'Checks: Read & Write' permission to your GitHub App.`
-        );
-      }
-
-      // Create a pending check run if we have permission
-      if (permissions.hasChecksWrite) {
-        await octokit.rest.checks.create({
-          owner,
-          repo,
-          name: "Semgrep Security Scan",
-          head_sha: headSha,
-          status: "in_progress",
-          output: {
-            title: "Semgrep scan in progress...",
-            summary: "🔍 Scanning code for security vulnerabilities...",
-          },
-        });
-
-        Logger.info(
-          `Started Semgrep scan check run for ${eventType} PR #${prNumber}`
-        );
-      } else {
-        Logger.info(
-          `Starting Semgrep scan for ${eventType} PR #${prNumber} (status checks disabled due to missing permissions)`
-        );
-      }
+      await octokit.rest.checks.create({
+        owner,
+        repo,
+        name: "Semgrep Security Scan",
+        head_sha: headSha,
+        status: "in_progress",
+        output: {
+          title: "Semgrep scan in progress...",
+          summary: "🔍 Scanning code for security vulnerabilities...",
+        },
+      });
 
       // Create temporary directory and clone repository
       tempDir = await semgrepService.createTempDirectory();
@@ -90,98 +55,28 @@ const handlePullRequestScan = (eventType: "opened") => {
           timeout: 300, // 5 minutes timeout
         });
 
-      // Format text output for GitHub comment
-      Logger.info(
-        `Formatting ${scanResult.results.length} findings for comment...`
-      );
-
-      // Debug: Log finding details
-      scanResult.results.forEach((finding, index) => {
-        Logger.debug(
-          `Finding ${index + 1}: ${finding.check_id} in ${finding.path}:${
-            finding.start.line
-          } (severity: ${finding.extra.severity})`
-        );
-      });
-
-      // Use text output for comment with markdown formatting
-      const commentBody = `🔍 **Semgrep Security Scan Results**
-
-${
-  textOutput.length > 0
-    ? `\`\`\`\n${textOutput}\n\`\`\``
-    : "🎉 No security issues found! ✅"
-}
-
-*This scan was performed automatically when the pull request was ${eventType}.*
-*Found issues? Check the [Semgrep documentation](https://semgrep.dev/docs/) for remediation guidance.*`;
-
-      Logger.info(
-        `Generated comment body length: ${commentBody.length} characters`
-      );
-      Logger.debug(`Comment preview: ${commentBody.substring(0, 200)}...`);
-
       // Post scan results as a comment using the new function
-      if (true) {
-        const commentPosted = await postSemgrepResultsComment(
-          octokit,
-          owner,
-          repo,
-          prNumber,
-          textOutput,
-          scanResult.results.length,
-          eventType
-        );
-
-        if (commentPosted) {
-          Logger.success(`Posted scan results comment to PR #${prNumber}`);
-        } else {
-          Logger.warning(`Failed to post comment to PR #${prNumber}`);
-          // Log results to console as fallback
-          Logger.info(
-            `Semgrep scan results for PR #${prNumber}:\n${textOutput}`
-          );
-        }
-      } else {
-        Logger.warning(
-          `Cannot post scan results to PR #${prNumber} due to missing 'issues: write' permission`
-        );
-        // Log results to console as fallback
-        Logger.info(`Semgrep scan results for PR #${prNumber}:\n${textOutput}`);
-      }
+      await postSemgrepResultsComment(
+        octokit,
+        owner,
+        repo,
+        prNumber,
+        textOutput,
+        scanResult.results.length,
+        eventType
+      );
 
       // Create check run with results if we have permission
-      if (permissions.hasChecksWrite) {
-        const checkStatus = semgrepService.getCheckRunStatus(
-          scanResult.results
-        );
-        const checkCreated = await createCheckRun(
-          octokit,
-          owner,
-          repo,
-          headSha,
-          checkStatus.conclusion,
-          checkStatus.title,
-          checkStatus.summary,
-          textOutput // Use text output instead of formatted comment
-        );
-
-        if (checkCreated) {
-          Logger.success(
-            `Check run created for PR #${prNumber} with conclusion: ${checkStatus.conclusion}`
-          );
-        }
-      } else {
-        const checkStatus = semgrepService.getCheckRunStatus(
-          scanResult.results
-        );
-        Logger.info(
-          `Scan completed for PR #${prNumber}: ${checkStatus.title} (status checks disabled)`
-        );
-      }
-
-      Logger.success(
-        `Semgrep scan completed for ${eventType} PR #${prNumber}. Found ${scanResult.results.length} findings.`
+      const checkStatus = semgrepService.getCheckRunStatus(scanResult.results);
+      await createCheckRun(
+        octokit,
+        owner,
+        repo,
+        headSha,
+        checkStatus.conclusion,
+        checkStatus.title,
+        checkStatus.summary,
+        textOutput // Use text output instead of formatted comment
       );
 
       // Send results to external service or export to file (optional)
@@ -206,31 +101,27 @@ ${
       Logger.error(`Error processing ${eventType} PR #${prNumber}:`, error);
 
       // Create failed check run if we have permission
-      const permissions = await checkAppPermissions(octokit, owner, repo);
-      if (permissions.hasChecksWrite) {
-        try {
-          const checkCreated = await createCheckRun(
-            octokit,
-            owner,
-            repo,
-            headSha,
-            "failure",
-            "Semgrep scan failed",
-            `❌ Semgrep security scan encountered an error: ${error.message}`,
-            `The security scan could not be completed due to an error:\n\n\`\`\`\n${error.message}\n\`\`\``
-          );
+      try {
+        const checkCreated = await createCheckRun(
+          octokit,
+          owner,
+          repo,
+          headSha,
+          "failure",
+          "Semgrep scan failed",
+          `❌ Semgrep security scan encountered an error: ${error.message}`,
+          `The security scan could not be completed due to an error:\n\n\`\`\`\n${error.message}\n\`\`\``
+        );
 
-          if (checkCreated) {
-            Logger.info(`Error check run created for PR #${prNumber}`);
-          }
-        } catch (checkError) {
-          Logger.error(
-            `Failed to create error check run for PR #${prNumber}:`,
-            checkError
-          );
+        if (checkCreated) {
+          Logger.info(`Error check run created for PR #${prNumber}`);
         }
+      } catch (checkError) {
+        Logger.error(
+          `Failed to create error check run for PR #${prNumber}:`,
+          checkError
+        );
       }
-
       // Post error comment if we have permission
       try {
         await octokit.rest.issues.createComment({

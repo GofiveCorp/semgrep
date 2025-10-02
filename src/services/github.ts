@@ -99,47 +99,6 @@ export const getInstallationId = async (
 };
 
 /**
- * Checks if the GitHub App has the required permissions
- */
-export const checkAppPermissions = async (
-  octokit: InstanceType<typeof Octokit>,
-  owner: string,
-  repo: string
-): Promise<{
-  hasChecksWrite: boolean;
-  hasContentsRead: boolean;
-  hasIssuesWrite: boolean;
-  hasPullRequestsRead: boolean;
-}> => {
-  try {
-    const { data: installation } = await octokit.rest.apps.getRepoInstallation({
-      owner,
-      repo,
-    });
-
-    const permissions = installation.permissions || {};
-
-    return {
-      hasChecksWrite: permissions.checks === "write",
-      hasContentsRead:
-        permissions.contents === "read" || permissions.contents === "write",
-      hasIssuesWrite: permissions.issues === "write",
-      hasPullRequestsRead:
-        permissions.pull_requests === "read" ||
-        permissions.pull_requests === "write",
-    };
-  } catch (error) {
-    Logger.error(`Failed to check permissions for ${owner}/${repo}:`, error);
-    return {
-      hasChecksWrite: false,
-      hasContentsRead: false,
-      hasIssuesWrite: false,
-      hasPullRequestsRead: false,
-    };
-  }
-};
-
-/**
  * Posts Semgrep scan results as a GitHub comment with text output
  */
 export const postSemgrepResultsComment = async (

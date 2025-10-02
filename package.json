@@ -8,7 +8,9 @@
     "start": "node dist/app.js",
     "dev": "node --loader ts-node/esm src/app.ts",
     "server": "npm run dev",
-    "lint": "standard"
+    "lint": "standard",
+    "test:semgrep": "npm run build && node test-semgrep.js",
+    "scan": "semgrep --config=auto --exclude=node_modules/* --exclude=dist/* ./src"
   },
   "devDependencies": {
     "@types/node": "^24.6.2",
@@ -18,8 +20,10 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "child_process": "^1.0.2",
     "dotenv": "^16.0.3",
-    "octokit": "^4.1.1"
+    "octokit": "^4.1.1",
+    "util": "^0.12.5"
   },
   "description": "This sample app showcases how webhooks can be used with a GitHub App's installation token to create a bot that responds to issues. Code uses [octokit.js](https://github.com/octokit/octokit.js).",
   "main": "app.js",

@@ -1,25 +1,55 @@
-# Sample GitHub App
+# Semgrep GitHub Security Scanner
 
-This sample app showcases how webhooks can be used with a GitHub App's installation token to create a bot that responds to issues. Code uses [octokit.js](https://github.com/octokit/octokit.js).
+This GitHub App automatically performs security scanning using [Semgrep](https://semgrep.dev/) when pull requests are opened or reopened. It provides comprehensive security analysis and reports results as GitHub status checks and pull request comments.
 
-## Requirements
+## 🚀 Features
+
+- **Automated Security Scanning**: Scans code for vulnerabilities when PRs are opened/reopened
+- **GitHub Status Checks**: Creates status checks that can block merging if critical issues are found
+- **Detailed Reporting**: Posts detailed findings as PR comments with severity levels
+- **Custom Rules**: Includes both Semgrep Registry rules and custom security patterns
+- **Permission-Aware**: Gracefully handles missing permissions with informative logging
+
+## 📋 Requirements
 
 - Node.js 20 or higher
-- A GitHub App subscribed to **Pull Request** events and with the following permissions:
-  - Pull requests: Read & write
-  - Metadata: Read-only
-- (For local development) A tunnel to expose your local server to the internet (e.g. [smee](https://smee.io/), [ngrok](https://ngrok.com/) or [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/tunnel-guide/local/))
-- Your GitHub App Webhook must be configured to receive events at a URL that is accessible from the internet.
+- [Semgrep CLI](https://semgrep.dev/docs/getting-started/) installed
+- A GitHub App with specific permissions (see setup guide)
+- (For local development) A tunnel to expose your local server (e.g. [smee](https://smee.io/), [ngrok](https://ngrok.com/))
 
-## Setup
+## ⚙️ Setup
 
-1. Clone this repository.
-2. Create a `.env` file similar to `.env.example` and set actual values. If you are using GitHub Enterprise Server, also include a `ENTERPRISE_HOSTNAME` variable and set the value to the name of your GitHub Enterprise Server instance.
-3. Install dependencies with `npm install`.
-4. Start the server with `npm run server`.
-5. Ensure your server is reachable from the internet.
-    - If you're using `smee`, run `smee -u <smee_url> -t http://localhost:3000/api/webhook`.
-6. Ensure your GitHub App includes at least one repository on its installations.
+### 1. GitHub App Configuration
+
+**Important**: Your GitHub App needs specific permissions to function properly.
+
+📖 **[Complete GitHub App Setup Guide](./GITHUB_APP_SETUP.md)**
+
+Required permissions:
+
+- **Checks**: Read & Write (for status checks)
+- **Contents**: Read (for cloning repositories)
+- **Issues**: Write (for posting comments)
+- **Pull requests**: Read (for accessing PR data)
+
+### 2. Application Setup
+
+1. Clone this repository
+2. Create a `.env` file similar to `.env.example` with your values
+3. Install dependencies: `npm install`
+4. Build the application: `npm run build`
+5. Start the server: `npm run server`
+
+### 3. Webhook Configuration
+
+- Set your webhook URL to point to your server
+- Subscribe to **Pull requests** events
+- Ensure webhook secret matches your `.env` file
+
+## 📖 Documentation
+
+- **[Semgrep Integration Details](./SEMGREP_INTEGRATION.md)** - Complete feature documentation
+- **[GitHub App Setup Guide](./GITHUB_APP_SETUP.md)** - Permission configuration guide
 
 ## Usage
 

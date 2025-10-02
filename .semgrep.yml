@@ -1,0 +1,61 @@
+# Semgrep configuration for GitHub App security scanning
+rules:
+  # JavaScript/TypeScript Security Rules
+  - id: javascript-express-hardcoded-secret
+    patterns:
+      - pattern: |
+          $SECRET = "..."
+      - pattern: |
+          $SECRET = '...'
+    message: Hardcoded secret detected
+    languages: [javascript, typescript]
+    severity: ERROR
+
+  - id: javascript-sql-injection
+    patterns:
+      - pattern: |
+          $QUERY = "SELECT * FROM " + $USER_INPUT
+      - pattern: |
+          $QUERY = 'SELECT * FROM ' + $USER_INPUT
+    message: Potential SQL injection vulnerability
+    languages: [javascript, typescript]
+    severity: ERROR
+
+  - id: javascript-unsafe-eval
+    patterns:
+      - pattern: eval($X)
+      - pattern: Function($X)
+    message: Unsafe use of eval() or Function() constructor
+    languages: [javascript, typescript]
+    severity: WARNING
+
+  - id: javascript-path-traversal
+    patterns:
+      - pattern: |
+          fs.readFile($USER_INPUT, ...)
+      - pattern: |
+          fs.readFileSync($USER_INPUT, ...)
+    message: Potential path traversal vulnerability
+    languages: [javascript, typescript]
+    severity: WARNING
+
+  # GitHub App specific security rules
+  - id: github-app-token-exposure
+    patterns:
+      - pattern: |
+          console.log(..., $TOKEN, ...)
+      - pattern: |
+          console.error(..., $TOKEN, ...)
+    metavariable-regex:
+      $TOKEN: .*(token|secret|key|password).*
+    message: Potential token or secret exposure in logs
+    languages: [javascript, typescript]
+    severity: ERROR
+
+  - id: github-webhook-verification
+    patterns:
+      - pattern: |
+          app.webhooks.on($EVENT, $HANDLER)
+    message: Ensure webhook signature verification is implemented
+    languages: [javascript, typescript]
+    severity: INFO
